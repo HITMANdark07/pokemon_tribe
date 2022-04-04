@@ -1,9 +1,91 @@
+import axios from 'axios';
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import styled, { css } from 'styled-components';
+import Card from '../components/Card';
+import Sidebar from '../components/Sidebar';
+import Button from '../components/styled/Button/Button';
+import { addNewPokemons, setPokemons } from '../redux/pokemon/pokemon.actions';
 import styles from '../styles/Home.module.css'
+import { pokemonType, StoreState } from '../types';
+
 
 const Home: NextPage = () => {
+
+  const [offset, setOffSet] = useState(0);
+  let showRef = useRef<HTMLDivElement>(null);
+  const [isEnd, setIsEnd] = useState(false);
+  const dispatch = useDispatch();
+  const { pokemons } = useSelector((state:StoreState) => state.pokemon);
+  const { activeType } = useSelector(
+    (state: StoreState) => state.pokemon
+  );
+
+  const init = async() => {
+    try{
+      const {data} = await axios({
+        method:'GET',
+        url:`https://pokeapi.co/api/v2/pokemon/?offset=${offset}&limit=20`
+      })
+      if(offset===0){
+        dispatch(setPokemons(data.results));
+      }else{
+        dispatch(addNewPokemons(data.results));
+        if(data.results.length<20) setIsEnd(true);
+      }
+    }catch(err){
+      console.log(err);
+    }
+  }
+  const init2 = async() => {
+    try{
+      const {data} = await axios({
+        method:'GET',
+        url:activeType
+      })
+      let poke: any[] = [];
+      data.pokemon.map((pk:any) => {
+        poke.push(pk.pokemon)
+      })
+      dispatch(setPokemons(poke));
+    }catch(err){
+      console.log(err);
+    }
+  }
+  useEffect(() => {
+    if(activeType==='all'){
+      init();
+    }else{
+      setOffSet(0);
+      init2();
+    }
+  },[activeType, offset]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  },[activeType]);
+
+  const handleObserver = useCallback((entries) => {
+    const target = entries[0];
+    if (target.isIntersecting) {
+      setOffSet((prev) => prev + 20);
+      console.log(offset);
+    }
+  }, []);
+  
+  useEffect(() => {
+    const option = {
+      root: null,
+      rootMargin: "20px",
+      threshold: 0
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (showRef.current) observer.observe(showRef.current);
+  }, [handleObserver]);
+  
   return (
     <div className={styles.container}>
       <Head>
@@ -12,59 +94,19 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.tsx</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+        <main className={styles.main}>
+          <Sidebar />
+        <div className={styles.container2}>
+          {
+            pokemons.map((pokemon:pokemonType) => (
+              <Card key={pokemon.url} name={pokemon.name} url={pokemon.url} /> 
+            ))
+          }
+          {activeType==='all' && <div ref={showRef}  style={{fontSize:25, textAlign:'center'}}>Loading...</div>}
         </div>
+        
       </main>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
   )
 }
